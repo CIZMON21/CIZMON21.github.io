@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Interactive Spider Art</title>
+    <title>Skeleton Spider Art</title>
     <style>
         body { 
             margin: 0;
@@ -43,6 +43,65 @@
             mouse.y = e.clientY;
         });
 
+        // Function to draw a skull-like body
+        function drawSkull(x, y, size) {
+            ctx.fillStyle = '#eee';
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(x, y, size, size * 0.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Eyes
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.ellipse(x - size/3, y - size/6, size/6, size/4, 0, 0, Math.PI * 2);
+            ctx.ellipse(x + size/3, y - size/6, size/6, size/4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - size/10, y + size/6);
+            ctx.lineTo(x + size/10, y + size/6);
+            ctx.closePath();
+            ctx.fill();
+
+            // Teeth
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1;
+            let teethCount = 6;
+            let startX = x - size/2.5;
+            let endX = x + size/2.5;
+            let yTeeth = y + size/3;
+            ctx.beginPath();
+            for(let i = 0; i <= teethCount; i++) {
+                let tx = startX + (i * (endX - startX) / teethCount);
+                ctx.moveTo(tx, yTeeth);
+                ctx.lineTo(tx, yTeeth + size/10);
+            }
+            ctx.stroke();
+        }
+
+        // Function to draw bone-like legs
+        function drawBoneLeg(x1, y1, x2, y2) {
+            ctx.strokeStyle = '#eee';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            // Draw joints as circles
+            ctx.fillStyle = '#eee';
+            ctx.beginPath();
+            ctx.arc(x1, y1, 6, 0, Math.PI * 2);
+            ctx.arc(x2, y2, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         // Animation loop
         function animate() {
             ctx.fillStyle = '#111';
@@ -52,24 +111,16 @@
             spider.x += (mouse.x - spider.x) * 0.1;
             spider.y += (mouse.y - spider.y) * 0.1;
             
-            // Draw spider body
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(spider.x, spider.y, spider.size, 0, Math.PI*2);
-            ctx.fill();
+            // Draw skull body
+            drawSkull(spider.x, spider.y, spider.size);
             
-            // Draw legs
-            ctx.strokeStyle = '#fff';
+            // Draw bone legs
             for(let i = 0; i < 8; i++) {
                 const angle = (i/8) * Math.PI*2;
                 const legLength = spider.size * 3;
-                ctx.beginPath();
-                ctx.moveTo(spider.x, spider.y);
-                ctx.lineTo(
-                    spider.x + Math.cos(angle)*legLength,
-                    spider.y + Math.sin(angle)*legLength
-                );
-                ctx.stroke();
+                const x2 = spider.x + Math.cos(angle)*legLength;
+                const y2 = spider.y + Math.sin(angle)*legLength;
+                drawBoneLeg(spider.x, spider.y, x2, y2);
             }
             
             requestAnimationFrame(animate);
@@ -78,4 +129,3 @@
     </script>
 </body>
 </html>
-
