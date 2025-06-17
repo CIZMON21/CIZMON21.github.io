@@ -1,1 +1,81 @@
-GOD
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interactive Spider Art</title>
+    <style>
+        body { 
+            margin: 0;
+            background: #111;
+            overflow: hidden;
+        }
+        canvas {
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="spiderCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('spiderCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Spider properties
+        let spider = {
+            x: canvas.width/2,
+            y: canvas.height/2,
+            size: 20,
+            legs: []
+        };
+
+        // Mouse tracking
+        let mouse = {x: 0, y: 0};
+        canvas.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        // Animation loop
+        function animate() {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update spider position
+            spider.x += (mouse.x - spider.x) * 0.1;
+            spider.y += (mouse.y - spider.y) * 0.1;
+            
+            // Draw spider body
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(spider.x, spider.y, spider.size, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Draw legs
+            ctx.strokeStyle = '#fff';
+            for(let i = 0; i < 8; i++) {
+                const angle = (i/8) * Math.PI*2;
+                const legLength = spider.size * 3;
+                ctx.beginPath();
+                ctx.moveTo(spider.x, spider.y);
+                ctx.lineTo(
+                    spider.x + Math.cos(angle)*legLength,
+                    spider.y + Math.sin(angle)*legLength
+                );
+                ctx.stroke();
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
+
