@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Skeleton Spider Art</title>
+    <title>GOD</title>
     <style>
         body { 
             margin: 0;
-            background: #111;
+            background: #0a0a0a;
             overflow: hidden;
         }
         canvas {
-            cursor: crosshair;
+            cursor: none;
         }
     </style>
 </head>
 <body>
-    <canvas id="spiderCanvas"></canvas>
+    <canvas id="dragonCanvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('spiderCanvas');
+        const canvas = document.getElementById('dragonCanvas');
         const ctx = canvas.getContext('2d');
         
         // Set canvas size
@@ -28,100 +28,187 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Spider properties
-        let spider = {
-            x: canvas.width/2,
-            y: canvas.height/2,
-            size: 20,
-            legs: []
+        // Dragon configuration
+        const dragon = {
+            segments: [],
+            segmentCount: 24,
+            baseSpeed: 0.12,
+            bodyWave: 0,
+            wingFlap: 0
         };
 
-        // Mouse tracking
-        let mouse = {x: 0, y: 0};
+        // Initialize dragon segments with physics
+        class DragonSegment {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.targetX = x;
+                this.targetY = y;
+            }
+        }
+
+        for(let i = 0; i < dragon.segmentCount; i++) {
+            dragon.segments.push(new DragonSegment(
+                canvas.width/2,
+                canvas.height/2 - i * 15
+            ));
+        }
+
+        // Mouse interaction
+        const mouse = { x: canvas.width/2, y: canvas.height/2 };
         canvas.addEventListener('mousemove', (e) => {
             mouse.x = e.clientX;
             mouse.y = e.clientY;
         });
 
-        // Function to draw a skull-like body
-        function drawSkull(x, y, size) {
-            ctx.fillStyle = '#eee';
-            ctx.strokeStyle = '#ccc';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.ellipse(x, y, size, size * 0.8, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-
-            // Eyes
-            ctx.fillStyle = '#111';
-            ctx.beginPath();
-            ctx.ellipse(x - size/3, y - size/6, size/6, size/4, 0, 0, Math.PI * 2);
-            ctx.ellipse(x + size/3, y - size/6, size/6, size/4, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Nose
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x - size/10, y + size/6);
-            ctx.lineTo(x + size/10, y + size/6);
-            ctx.closePath();
-            ctx.fill();
-
-            // Teeth
-            ctx.strokeStyle = '#111';
-            ctx.lineWidth = 1;
-            let teethCount = 6;
-            let startX = x - size/2.5;
-            let endX = x + size/2.5;
-            let yTeeth = y + size/3;
-            ctx.beginPath();
-            for(let i = 0; i <= teethCount; i++) {
-                let tx = startX + (i * (endX - startX) / teethCount);
-                ctx.moveTo(tx, yTeeth);
-                ctx.lineTo(tx, yTeeth + size/10);
-            }
-            ctx.stroke();
-        }
-
-        // Function to draw bone-like legs
-        function drawBoneLeg(x1, y1, x2, y2) {
-            ctx.strokeStyle = '#eee';
-            ctx.lineWidth = 4;
+        // Bone drawing functions
+        function drawBone(x1, y1, x2, y2, width) {
+            ctx.strokeStyle = `rgba(240,240,240,${0.9 - (width/40)})`;
+            ctx.lineWidth = width;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
+        }
 
-            // Draw joints as circles
-            ctx.fillStyle = '#eee';
+        function drawJoint(x, y, size) {
+            ctx.fillStyle = '#f0f0f0';
             ctx.beginPath();
-            ctx.arc(x1, y1, 6, 0, Math.PI * 2);
-            ctx.arc(x2, y2, 6, 0, Math.PI * 2);
+            ctx.arc(x, y, size, 0, Math.PI*2);
             ctx.fill();
+        }
+
+        // Dragon components
+        function drawSkull(x, y) {
+            // Main cranium
+            ctx.fillStyle = '#f0f0f0';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 25, 18, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Jaw structure
+            ctx.beginPath();
+            ctx.ellipse(x, y + 12, 20, 10, 0, 0, Math.PI);
+            ctx.fill();
+            
+            // Eye sockets
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.ellipse(x - 12, y - 5, 8, 6, 0, 0, Math.PI*2);
+            ctx.ellipse(x + 12, y - 5, 8, 6, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Horns with curvature
+            drawBone(x - 18, y - 15, x - 35, y - 45, 8);
+            drawBone(x + 18, y - 15, x + 35, y - 45, 8);
+        }
+
+        function updatePhysics() {
+            // Update body wave
+            dragon.bodyWave = (dragon.bodyWave + 0.04) % (Math.PI*2);
+            dragon.wingFlap = Math.sin(Date.now()/180) * 0.5 + 0.5;
+
+            // Head follows mouse with smooth physics
+            const head = dragon.segments[0];
+            head.targetX = mouse.x;
+            head.targetY = mouse.y;
+            
+            // Update all segments with velocity-based movement
+            dragon.segments.forEach((segment, index) => {
+                const target = index === 0 ? 
+                    { x: head.targetX, y: head.targetY } : 
+                    dragon.segments[index-1];
+                
+                const dx = target.x - segment.x;
+                const dy = target.y - segment.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                const force = index === 0 ? 0.2 : 0.15;
+                
+                segment.vx += (dx/distance * force);
+                segment.vy += (dy/distance * force);
+                
+                // Add body undulation
+                if(index > 2) {
+                    const waveOffset = Math.sin(dragon.bodyWave + index*0.4) * 15;
+                    segment.vx += waveOffset * 0.02;
+                }
+                
+                // Velocity damping
+                segment.vx *= 0.92;
+                segment.vy *= 0.92;
+                
+                segment.x += segment.vx;
+                segment.y += segment.vy;
+            });
+        }
+
+        function drawDragon() {
+            // Draw spine with tapered bones
+            dragon.segments.forEach((segment, index) => {
+                if(index > 0) {
+                    const prev = dragon.segments[index-1];
+                    const width = 18 - (index * 0.65);
+                    drawBone(prev.x, prev.y, segment.x, segment.y, width);
+                }
+            });
+
+            // Draw rib cage
+            for(let i = 4; i < dragon.segmentCount - 5; i += 2) {
+                const segment = dragon.segments[i];
+                const angle = Math.atan2(
+                    dragon.segments[i+1].y - segment.y,
+                    dragon.segments[i+1].x - segment.x
+                );
+                
+                const ribLength = 40 + Math.sin(i + dragon.bodyWave)*8;
+                drawBone(
+                    segment.x, segment.y,
+                    segment.x + Math.cos(angle + Math.PI/2) * ribLength,
+                    segment.y + Math.sin(angle + Math.PI/2) * ribLength,
+                    6
+                );
+                drawBone(
+                    segment.x, segment.y,
+                    segment.x + Math.cos(angle - Math.PI/2) * ribLength,
+                    segment.y + Math.sin(angle - Math.PI/2) * ribLength,
+                    6
+                );
+            }
+
+            // Draw wings
+            const wingJoints = [3, 6, 9];
+            wingJoints.forEach(index => {
+                const segment = dragon.segments[index];
+                const flap = dragon.wingFlap * (index/10);
+                
+                drawBone(
+                    segment.x, segment.y,
+                    segment.x + 120 + flap*40, 
+                    segment.y - 80 - flap*60,
+                    10 - index
+                );
+                drawBone(
+                    segment.x, segment.y,
+                    segment.x - 120 - flap*40, 
+                    segment.y - 80 - flap*60,
+                    10 - index
+                );
+            });
+
+            // Draw skull
+            drawSkull(dragon.segments[0].x, dragon.segments[0].y);
         }
 
         // Animation loop
         function animate() {
-            ctx.fillStyle = '#111';
+            ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Update spider position
-            spider.x += (mouse.x - spider.x) * 0.1;
-            spider.y += (mouse.y - spider.y) * 0.1;
-            
-            // Draw skull body
-            drawSkull(spider.x, spider.y, spider.size);
-            
-            // Draw bone legs
-            for(let i = 0; i < 8; i++) {
-                const angle = (i/8) * Math.PI*2;
-                const legLength = spider.size * 3;
-                const x2 = spider.x + Math.cos(angle)*legLength;
-                const y2 = spider.y + Math.sin(angle)*legLength;
-                drawBoneLeg(spider.x, spider.y, x2, y2);
-            }
+            updatePhysics();
+            drawDragon();
             
             requestAnimationFrame(animate);
         }
