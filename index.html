@@ -1,16 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>GOD</title>
     <style>
-        body { 
-            margin: 0;
-            background: #0a0a0a;
-            overflow: hidden;
-        }
-        canvas {
-            cursor: none;
-        }
+        body { margin: 0; background: #0a0a0a; overflow: hidden; }
+        canvas { cursor: none; }
     </style>
 </head>
 <body>
@@ -20,195 +13,156 @@
         const canvas = document.getElementById('dragonCanvas');
         const ctx = canvas.getContext('2d');
         
-        // Set canvas size
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        // Dragon configuration
-        const dragon = {
+        // Configuration
+        const DRAGON = {
             segments: [],
-            segmentCount: 24,
-            baseSpeed: 0.12,
+            segmentCount: 28,
+            baseSpeed: 0.15,
             bodyWave: 0,
-            wingFlap: 0
+            wingFlap: 0,
+            physics: {
+                stiffness: 0.2,
+                damping: 0.92,
+                mass: 1.2
+            }
         };
 
-        // Initialize dragon segments with physics
-        class DragonSegment {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.vx = 0;
-                this.vy = 0;
-                this.targetX = x;
-                this.targetY = y;
-            }
+        // Responsive setup
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            DRAGON.segments = Array.from({ length: DRAGON.segmentCount }, (_, i) => ({
+                x: canvas.width/2,
+                y: canvas.height/2 - i * 18,
+                vx: 0,
+                vy: 0
+            }));
         }
+        window.addEventListener('resize', initCanvas);
+        initCanvas();
 
-        for(let i = 0; i < dragon.segmentCount; i++) {
-            dragon.segments.push(new DragonSegment(
-                canvas.width/2,
-                canvas.height/2 - i * 15
-            ));
-        }
-
-        // Mouse interaction
+        // Mouse tracking
         const mouse = { x: canvas.width/2, y: canvas.height/2 };
-        canvas.addEventListener('mousemove', (e) => {
+        canvas.addEventListener('mousemove', e => {
             mouse.x = e.clientX;
             mouse.y = e.clientY;
         });
 
-        // Bone drawing functions
+        // Realistic bone rendering
         function drawBone(x1, y1, x2, y2, width) {
-            ctx.strokeStyle = `rgba(240,240,240,${0.9 - (width/40)})`;
+            ctx.beginPath();
+            ctx.strokeStyle = `hsl(0, 0%, ${90 - (width * 2)}%)`;
             ctx.lineWidth = width;
             ctx.lineCap = 'round';
-            ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
         }
 
-        function drawJoint(x, y, size) {
-            ctx.fillStyle = '#f0f0f0';
-            ctx.beginPath();
-            ctx.arc(x, y, size, 0, Math.PI*2);
-            ctx.fill();
-        }
-
-        // Dragon components
+        // Enhanced skull with temporal bones
         function drawSkull(x, y) {
-            // Main cranium
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Cranium
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
             ctx.fillStyle = '#f0f0f0';
-            ctx.beginPath();
-            ctx.ellipse(x, y, 25, 18, 0, 0, Math.PI*2);
             ctx.fill();
             
-            // Jaw structure
+            // Jaw
             ctx.beginPath();
-            ctx.ellipse(x, y + 12, 20, 10, 0, 0, Math.PI);
-            ctx.fill();
+            ctx.arc(0, 14, 18, 0.2, Math.PI - 0.2);
+            ctx.lineWidth = 4;
+            ctx.stroke();
             
-            // Eye sockets
+            // Nasal cavity
+            ctx.beginPath();
+            ctx.ellipse(0, -6, 8, 4, 0, 0, Math.PI * 2);
             ctx.fillStyle = '#2a2a2a';
-            ctx.beginPath();
-            ctx.ellipse(x - 12, y - 5, 8, 6, 0, 0, Math.PI*2);
-            ctx.ellipse(x + 12, y - 5, 8, 6, 0, 0, Math.PI*2);
             ctx.fill();
             
-            // Horns with curvature
-            drawBone(x - 18, y - 15, x - 35, y - 45, 8);
-            drawBone(x + 18, y - 15, x + 35, y - 45, 8);
+            ctx.restore();
         }
 
-        function updatePhysics() {
-            // Update body wave
-            dragon.bodyWave = (dragon.bodyWave + 0.04) % (Math.PI*2);
-            dragon.wingFlap = Math.sin(Date.now()/180) * 0.5 + 0.5;
+        // Physics-based movement
+        function updateDragon() {
+            DRAGON.bodyWave = (DRAGON.bodyWave + 0.03) % (Math.PI * 2);
+            DRAGON.wingFlap = Math.sin(Date.now()/200) * 0.7;
 
-            // Head follows mouse with smooth physics
-            const head = dragon.segments[0];
-            head.targetX = mouse.x;
-            head.targetY = mouse.y;
-            
-            // Update all segments with velocity-based movement
-            dragon.segments.forEach((segment, index) => {
-                const target = index === 0 ? 
-                    { x: head.targetX, y: head.targetY } : 
-                    dragon.segments[index-1];
+            DRAGON.segments.forEach((seg, i) => {
+                const target = i === 0 ? mouse : DRAGON.segments[i-1];
+                const dx = target.x - seg.x;
+                const dy = target.y - seg.y;
+                const distance = Math.hypot(dx, dy);
                 
-                const dx = target.x - segment.x;
-                const dy = target.y - segment.y;
-                const distance = Math.sqrt(dx*dx + dy*dy);
-                const force = index === 0 ? 0.2 : 0.15;
-                
-                segment.vx += (dx/distance * force);
-                segment.vy += (dy/distance * force);
-                
-                // Add body undulation
-                if(index > 2) {
-                    const waveOffset = Math.sin(dragon.bodyWave + index*0.4) * 15;
-                    segment.vx += waveOffset * 0.02;
+                // Prevent division by zero
+                if (distance > 0) {
+                    const force = DRAGON.physics.stiffness * (i === 0 ? 0.25 : 1);
+                    seg.vx += (dx / distance) * force;
+                    seg.vy += (dy / distance) * force;
                 }
-                
+
+                // Body undulation
+                if (i > 3) {
+                    seg.vx += Math.sin(DRAGON.bodyWave + i * 0.3) * 0.15;
+                    seg.vy += Math.cos(DRAGON.bodyWave + i * 0.3) * 0.1;
+                }
+
                 // Velocity damping
-                segment.vx *= 0.92;
-                segment.vy *= 0.92;
+                seg.vx *= DRAGON.physics.damping;
+                seg.vy *= DRAGON.physics.damping;
                 
-                segment.x += segment.vx;
-                segment.y += segment.vy;
+                seg.x += seg.vx;
+                seg.y += seg.vy;
             });
         }
 
-        function drawDragon() {
-            // Draw spine with tapered bones
-            dragon.segments.forEach((segment, index) => {
-                if(index > 0) {
-                    const prev = dragon.segments[index-1];
-                    const width = 18 - (index * 0.65);
-                    drawBone(prev.x, prev.y, segment.x, segment.y, width);
-                }
-            });
-
-            // Draw rib cage
-            for(let i = 4; i < dragon.segmentCount - 5; i += 2) {
-                const segment = dragon.segments[i];
-                const angle = Math.atan2(
-                    dragon.segments[i+1].y - segment.y,
-                    dragon.segments[i+1].x - segment.x
+        // Realistic wing structure
+        function drawWings(baseX, baseY) {
+            ctx.save();
+            ctx.translate(baseX, baseY);
+            
+            const flapAngle = DRAGON.wingFlap * Math.PI/3;
+            for (let i = 0; i < 3; i++) {
+                const wingLength = 100 - i * 20;
+                const segmentAngle = flapAngle * (0.8 + i * 0.1);
+                
+                // Right wing
+                drawBone(0, 0, 
+                    Math.cos(-segmentAngle) * wingLength,
+                    Math.sin(-segmentAngle) * wingLength,
+                    12 - i * 2
                 );
                 
-                const ribLength = 40 + Math.sin(i + dragon.bodyWave)*8;
-                drawBone(
-                    segment.x, segment.y,
-                    segment.x + Math.cos(angle + Math.PI/2) * ribLength,
-                    segment.y + Math.sin(angle + Math.PI/2) * ribLength,
-                    6
-                );
-                drawBone(
-                    segment.x, segment.y,
-                    segment.x + Math.cos(angle - Math.PI/2) * ribLength,
-                    segment.y + Math.sin(angle - Math.PI/2) * ribLength,
-                    6
+                // Left wing
+                drawBone(0, 0, 
+                    Math.cos(Math.PI + segmentAngle) * wingLength,
+                    Math.sin(Math.PI + segmentAngle) * wingLength,
+                    12 - i * 2
                 );
             }
-
-            // Draw wings
-            const wingJoints = [3, 6, 9];
-            wingJoints.forEach(index => {
-                const segment = dragon.segments[index];
-                const flap = dragon.wingFlap * (index/10);
-                
-                drawBone(
-                    segment.x, segment.y,
-                    segment.x + 120 + flap*40, 
-                    segment.y - 80 - flap*60,
-                    10 - index
-                );
-                drawBone(
-                    segment.x, segment.y,
-                    segment.x - 120 - flap*40, 
-                    segment.y - 80 - flap*60,
-                    10 - index
-                );
-            });
-
-            // Draw skull
-            drawSkull(dragon.segments[0].x, dragon.segments[0].y);
+            ctx.restore();
         }
 
-        // Animation loop
+        // Main animation loop
         function animate() {
-            ctx.fillStyle = '#0a0a0a';
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.15)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            updatePhysics();
-            drawDragon();
+            updateDragon();
+            
+            // Draw spine
+            DRAGON.segments.forEach((seg, i) => {
+                if (i > 0) {
+                    const prev = DRAGON.segments[i-1];
+                    drawBone(prev.x, prev.y, seg.x, seg.y, 20 - i * 0.6);
+                }
+            });
+
+            // Draw wings
+            drawWings(DRAGON.segments[4].x, DRAGON.segments[4].y);
+            drawSkull(DRAGON.segments[0].x, DRAGON.segments[0].y);
             
             requestAnimationFrame(animate);
         }
