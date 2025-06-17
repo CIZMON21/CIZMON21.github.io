@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skeletal Dragon - Interactive Animation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <canvas id="dragonCanvas"></canvas>
+        
+        <!-- UI Controls -->
+        <div class="ui-controls">
+            <button id="toggleInstructions" class="btn btn--secondary btn--sm">
+                Instructions
+            </button>
+            <div class="performance-indicator">
+                <span id="fpsCounter">60 FPS</span>
+            </div>
+        </div>
+
+        <!-- Instructions Overlay -->
+        <div id="instructionsOverlay" class="instructions-overlay hidden">
+            <div class="instructions-content">
+                <h3>Interactive Skeletal Dragon</h3>
+                <ul>
+                    <li>Move your mouse to control the dragon's head</li>
+                    <li>The dragon's body follows with realistic physics</li>
+                    <li>Watch for particle trails and bone glow effects</li>
+                    <li>The dragon tracks your cursor like prey</li>
+                </ul>
+                <div class="github-info">
+                    <p class="status status--success">
+                        ✓ Ready for GitHub Pages hosting
+                    </p>
+                    <p>Upload this single HTML file to your repository and enable GitHub Pages!</p>
+                </div>
+                <button id="closeInstructions" class="btn btn--primary btn--sm">
+                    Got it!
+                </button>
+            </div>
+        </div>
+
+        <!-- Mouse Cursor Replacement -->
+        <div id="customCursor" class="custom-cursor"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
