@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Skeletal Dragon - GitHub Pages Ready</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            cursor: none;
+        }
+        
+        canvas {
+            display: block;
+            cursor: none;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        
+        .crosshair {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            transform: translate(-50%, -50%);
+        }
+        
+        .crosshair::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background: rgba(255, 100, 100, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="dragonCanvas"></canvas>
+    <div class="crosshair" id="crosshair"></div>
+    
+    <div class="controls">
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Mouse Speed: <span id="speed">0</span></div>
+        <div>Dragon Segments: <span id="segments">28</span></div>
+        <div>Particles: <span id="particles">0</span></div>
+    </div>
+    
+    <div class="instructions">
+        🐉 Move your mouse to guide the skeletal dragon • Hosted on GitHub Pages
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('dragonCanvas');
+        const ctx = canvas.getContext('2d');
+        const crosshair = document.getElementById('crosshair');
+        
+        // Performance monitoring
+        let fps = 0;
+        let frameCount = 0;
+        let lastTime = performance.now();
+        
+        // Dragon configuration
+        const DRAGON = {
+            segments: [],
+            segmentCount: 28,
+            bodyWave: 0,
+            wingFlap: 0,
+            physics: {
+                stiffness: 0.2,
+                damping: 0.92,
+                baseDistance: 25
+            }
+        };
+        
+        // Mouse tracking with velocity
+        const mouse = {
+            x: 0,
+            y: 0,
+            lastX: 0,
+            lastY: 0,
+            speed: 0,
+            maxSpeed: 15
+        };
+        
+        // Particle system
+        const particles = [];
+        const maxParticles = 50;
+        
+        // Initialize canvas and dragon
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Initialize dragon segments
+            DRAGON.segments = [];
+            for (let i = 0; i < DRAGON.segmentCount; i++) {
+                DRAGON.segments.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2 - i * 20,
+                    vx: 0,
+                    vy: 0,
+                    targetDistance: DRAGON.physics.baseDistance
+                });
+            }
+        }
+        
+        // Mouse event handlers
+        function updateMousePosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouse.lastX = mouse.x;
+            mouse.lastY = mouse.y;
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+            
+            // Update crosshair position
+            crosshair.style.left = e.clientX + 'px';
+            crosshair.style.top = e.clientY + 'px';
+            
+            // Calculate mouse speed
+            const dx = mouse.x - mouse.lastX;
+            const dy = mouse.y - mouse.lastY;
+            mouse.speed = Math.min(Math.sqrt(dx * dx + dy * dy) * 0.3, mouse.maxSpeed);
+        }
+        
+        canvas.addEventListener('mousemove', updateMousePosition);
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            updateMousePosition(e.touches[0]);
+        });
+        
+        window.addEventListener('resize', initCanvas);
+        initCanvas();
+        
+        // Utility functions
+        function safeNumber(value, fallback = 0) {
+            return (isFinite(value) && !isNaN(value)) ? value : fallback;
+        }
+        
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+        
+        // Bone rendering with realistic effects
+        function drawBone(x1, y1, x2, y2, width, opacity = 1) {
+            const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            
+            ctx.save();
+            ctx.translate(x1, y1);
+            ctx.rotate(angle);
+            
+            // Bone shadow
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(20, 20, 20, ${opacity * 0.3})`;
+            ctx.lineWidth = width + 2;
+            ctx.lineCap = 'round';
+            ctx.moveTo(2, 2);
+            ctx.lineTo(length + 2, 2);
+            ctx.stroke();
+            
+            // Main bone
+            const brightness = Math.max(85 - width * 2, 60);
+            ctx.beginPath();
+            ctx.strokeStyle = `hsla(45, 20%, ${brightness}%, ${opacity})`;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.moveTo(0, 0);
+            ctx.lineTo(length, 0);
+            ctx.stroke();
+            
+            // Bone highlight
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.2})`;
+            ctx.lineWidth = width * 0.3;
+            ctx.moveTo(0, -width * 0.2);
+            ctx.lineTo(length, -width * 0.2);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
+        // Enhanced skull with dynamic eyes
+        function drawSkull(x, y) {
+            const distanceToMouse = Math.sqrt((x - mouse.x) ** 2 + (y - mouse.y) ** 2);
+            const proximityFactor = Math.max(0, (200 - distanceToMouse) / 200);
+            
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Skull shadow
+            ctx.beginPath();
+            ctx.arc(2, 2, 26, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fill();
+            
+            // Main cranium
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, 0, Math.PI * 2);
+            ctx.fillStyle = `hsl(45, 20%, ${85 + proximityFactor * 10}%)`;
+            ctx.fill();
+            
+            // Nasal cavity
+            ctx.beginPath();
+            ctx.arc(0, -6, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fill();
+            
+            // Jaw structure
+            ctx.beginPath();
+            ctx.arc(0, 12, 16, 0.3, Math.PI - 0.3);
+            ctx.strokeStyle = `hsl(45, 20%, ${75 + proximityFactor * 10}%)`;
+            ctx.lineWidth = 6;
+            ctx.stroke();
+            
+            // Dynamic eyes that track mouse
+            const eyeGlow = 0.3 + proximityFactor * 0.7;
+            const pupilSize = 3 + proximityFactor * 3;
+            
+            // Left eye socket
+            ctx.beginPath();
+            ctx.arc(-12, -5, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            
+            // Left eye
+            ctx.beginPath();
+            ctx.arc(-12, -5, pupilSize, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 50, 50, ${eyeGlow})`;
+            ctx.fill();
+            
+            // Right eye socket
+            ctx.beginPath();
+            ctx.arc(12, -5, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fill();
+            
+            // Right eye
+            ctx.beginPath();
+            ctx.arc(12, -5, pupilSize, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 50, 50, ${eyeGlow})`;
+            ctx.fill();
+            
+            // Horns
+            drawBone(-18, -15, -35, -45, 8, 0.9);
+            drawBone(18, -15, 35, -45, 8, 0.9);
+            
+            ctx.restore();
+        }
+        
+        // Dynamic wing system
+        function drawWings(segment, flapIntensity) {
+            const wingSpan = 120;
+            const wingSegments = 4;
+            
+            ctx.save();
+            ctx.translate(segment.x, segment.y);
+            
+            for (let i = 0; i < wingSegments; i++) {
+                const segmentLength = wingSpan - i * 25;
+                const flapAngle = (Math.sin(Date.now() / 200 + i * 0.5) * 0.4 + flapIntensity) * (1 - i * 0.1);
+                
+                // Right wing
+                const rightX = Math.cos(-flapAngle) * segmentLength;
+                const rightY = Math.sin(-flapAngle) * segmentLength - 60;
+                drawBone(0, 0, rightX, rightY, 12 - i * 2, 0.8);
+                
+                // Left wing
+                const leftX = Math.cos(Math.PI + flapAngle) * segmentLength;
+                const leftY = Math.sin(Math.PI + flapAngle) * segmentLength - 60;
+                drawBone(0, 0, leftX, leftY, 12 - i * 2, 0.8);
+            }
+            
+            ctx.restore();
+        }
+        
+        // Particle system for magical effects
+        function updateParticles() {
+            // Add new particles based on dragon movement
+            if (particles.length < maxParticles && Math.random() < 0.3) {
+                const head = DRAGON.segments[0];
+                particles.push({
+                    x: head.x + (Math.random() - 0.5) * 40,
+                    y: head.y + (Math.random() - 0.5) * 40,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    life: 1.0,
+                    size: Math.random() * 3 + 1
+                });
+            }
+            
+            // Update existing particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life -= 0.02;
+                particle.vy += 0.05; // gravity
+                
+                if (particle.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+        
+        function drawParticles() {
+            particles.forEach(particle => {
+                ctx.save();
+                ctx.globalAlpha = particle.life;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${45 + particle.life * 30}, 70%, 70%)`;
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+        
+        // Advanced physics system
+        function updateDragonPhysics() {
+            DRAGON.bodyWave = (DRAGON.bodyWave + 0.03) % (Math.PI * 2);
+            
+            // Dynamic physics based on mouse speed
+            const speedFactor = mouse.speed * 0.1;
+            const dynamicStiffness = DRAGON.physics.stiffness + speedFactor * 0.05;
+            const dynamicDamping = DRAGON.physics.damping - speedFactor * 0.02;
+            
+            // Wing flapping based on movement
+            DRAGON.wingFlap = Math.sin(Date.now() / 180) * 0.5 + 0.5 + speedFactor * 0.3;
+            
+            DRAGON.segments.forEach((segment, index) => {
+                const target = index === 0 ? mouse : DRAGON.segments[index - 1];
+                const dx = target.x - segment.x;
+                const dy = target.y - segment.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 0.1) {
+                    const force = dynamicStiffness * (index === 0 ? 0.3 : 1);
+                    segment.vx += (dx / distance) * force;
+                    segment.vy += (dy / distance) * force;
+                }
+                
+                // Body undulation
+                if (index > 3) {
+                    const undulation = Math.sin(DRAGON.bodyWave + index * 0.3) * (2 + speedFactor);
+                    segment.vx += undulation * 0.1;
+                    segment.vy += Math.cos(DRAGON.bodyWave + index * 0.3) * 0.05;
+                }
+                
+                // Apply damping
+                segment.vx *= dynamicDamping;
+                segment.vy *= dynamicDamping;
+                
+                // Update position
+                segment.x = safeNumber(segment.x + segment.vx, canvas.width / 2);
+                segment.y = safeNumber(segment.y + segment.vy, canvas.height / 2);
+                
+                // Keep segments within bounds
+                segment.x = Math.max(50, Math.min(canvas.width - 50, segment.x));
+                segment.y = Math.max(50, Math.min(canvas.height - 50, segment.y));
+            });
+        }
+        
+        // Mouse-to-dragon connection line
+        function drawConnectionLine() {
+            const head = DRAGON.segments[0];
+            const distance = Math.sqrt((head.x - mouse.x) ** 2 + (head.y - mouse.y) ** 2);
+            const opacity = Math.max(0, (300 - distance) / 300) * 0.3;
+            
+            if (opacity > 0) {
+                ctx.beginPath();
+                ctx.strokeStyle = `rgba(255, 100, 100, ${opacity})`;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(mouse.x, mouse.y);
+                ctx.lineTo(head.x, head.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        // Performance monitoring
+        function updatePerformanceMetrics() {
+            frameCount++;
+            const currentTime = performance.now();
+            
+            if (currentTime - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+                frameCount = 0;
+                lastTime = currentTime;
+                
+                // Update UI
+                document.getElementById('fps').textContent = fps;
+                document.getElementById('speed').textContent = Math.round(mouse.speed * 10) / 10;
+                document.getElementById('segments').textContent = DRAGON.segments.length;
+                document.getElementById('particles').textContent = particles.length;
+            }
+        }
+        
+        // Main animation loop
+        function animate() {
+            // Clear canvas with motion blur effect
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update systems
+            updateDragonPhysics();
+            updateParticles();
+            updatePerformanceMetrics();
+            
+            // Draw connection line
+            drawConnectionLine();
+            
+            // Draw particles
+            drawParticles();
+            
+            // Draw dragon spine
+            DRAGON.segments.forEach((segment, index) => {
+                if (index > 0) {
+                    const prevSegment = DRAGON.segments[index - 1];
+                    const boneWidth = Math.max(18 - index * 0.6, 3);
+                    drawBone(prevSegment.x, prevSegment.y, segment.x, segment.y, boneWidth);
+                }
+            });
+            
+            // Draw rib cage
+            for (let i = 4; i < DRAGON.segments.length - 6; i += 3) {
+                const segment = DRAGON.segments[i];
+                const nextSegment = DRAGON.segments[i + 1];
+                const angle = Math.atan2(nextSegment.y - segment.y, nextSegment.x - segment.x);
+                const ribLength = 35 + Math.sin(DRAGON.bodyWave + i) * 8;
+                
+                // Left rib
+                drawBone(
+                    segment.x, segment.y,
+                    segment.x + Math.cos(angle + Math.PI / 2) * ribLength,
+                    segment.y + Math.sin(angle + Math.PI / 2) * ribLength,
+                    6, 0.7
+                );
+                
+                // Right rib
+                drawBone(
+                    segment.x, segment.y,
+                    segment.x + Math.cos(angle - Math.PI / 2) * ribLength,
+                    segment.y + Math.sin(angle - Math.PI / 2) * ribLength,
+                    6, 0.7
+                );
+            }
+            
+            // Draw wings
+            if (DRAGON.segments.length > 5) {
+                drawWings(DRAGON.segments[5], DRAGON.wingFlap);
+            }
+            
+            // Draw skull
+            drawSkull(DRAGON.segments[0].x, DRAGON.segments[0].y);
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Initialize mouse position
+        mouse.x = canvas.width / 2;
+        mouse.y = canvas.height / 2;
+        crosshair.style.left = mouse.x + 'px';
+        crosshair.style.top = mouse.y + 'px';
+        
+        // Start animation
+        animate();
+        
+        // Error handling
+        window.addEventListener('error', (e) => {
+            console.error('Dragon animation error:', e.error);
+        });
+        
+    </script>
+</body>
+</html>
